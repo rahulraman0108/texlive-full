@@ -12,16 +12,36 @@ env:
   # IMAGE_TAG: base
 
 jobs:
-  build-push-image:
-    runs-on: ubuntu-latest
+  build-image:
     strategy:
       fail-fast: false
-      max-parallel: 8
+      # max-parallel: 14
       matrix:
         tex-version: [2020, 2021, 2022, 2023, 2024, 2025]
+        platform: [linux/amd64, linux/arm64]
+        include:
+        - platform: linux/amd64
+          runner: ubuntu-latest
+          platform_pair: linux_amd64
+        - platform: linux/arm64
+          runner: ubuntu-24.04-arm
+          platform_pair: linux_arm64
+
+    runs-on: ${{ matrix.runner }}
+    name: Build image for TeX Live ${{ matrix.tex-version }} on ${{ matrix.platform }}
+    continue-on-error: true
+
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@main
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,enable=true,value=${{ matrix.tex-version }}.1
 
       - name: 'Login to GitHub Container Registry'
         uses: docker/login-action@v3.0.0
@@ -30,18 +50,108 @@ jobs:
           username: ${{github.actor}}
           password: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Clean runner for Docker builds
+        uses: sctg-development/clean-image-for-docker@v2
+        with:
+          remove-development-tools: 'true'
+          remove-browsers: 'true'
+          remove-databases: 'true'
+          remove-cloud-tools: 'true'
+          remove-testing-tools: 'true'
+          remove-documentation: 'true'
+          remove-android: 'true'
+          remove-cached-tools: 'true'
+          show-top-packages: 'true'
 
-      - name: Set up Docker Buildx for multi-platform builds
+      # - name: Set up QEMU
+        # uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image by digest
         id: docker_build
-        uses: docker/build-push-action@v5.1.0
+        uses: docker/build-push-action@v6
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ github.workflow }}-${{ matrix.tex-version }}-${{ matrix.platform_pair }}
+          cache-to: type=gha,scope=${{ github.workflow }}-${{ matrix.tex-version }}-${{ matrix.platform_pair }},mode=max
+          # platforms: linux/amd64,linux/arm64
           context: texlive/${{ matrix.tex-version }}
           file: texlive/${{ matrix.tex-version }}/Dockerfile
-          push: true
-          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1
+          # push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          # tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.docker_build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.tex-version }}-${{ matrix.platform_pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        tex-version: [2020, 2021, 2022, 2023, 2024, 2025]
+    runs-on: ubuntu-latest
+    name: Merge and push image for TeX Live ${{ matrix.tex-version }}
+    needs:
+      - build-image
+    if: always()
+    continue-on-error: true
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.tex-version }}-*
+          merge-multiple: true
+
+      - name: 'Login to GitHub Container Registry'
+        uses: docker/login-action@v3.0.0
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # - name: Docker meta
+      #   id: meta
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: $\{{ env.DOCKER_REGISTRY }}/$\{{ env.IMAGE_NAME }}
+      #     tags: |
+      #       type=ref,event=branch
+      #       type=ref,event=pr
+      #       type=semver,pattern={{version}}
+      #       type=semver,pattern={{major}}.{{minor}}
+      #       type=raw,enable=true,value=$\{{ matrix.tex-version }}.1
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        # run: |
+          # docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            # $(printf '$\{{ env.DOCKER_REGISTRY }}/$\{{ env.IMAGE_NAME }}@sha256:%s ' *)
+        run: |
+          docker buildx imagetools create -t ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1 \
+            $(printf '${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1
