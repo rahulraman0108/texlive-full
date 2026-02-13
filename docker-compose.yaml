@@ -13,6 +13,11 @@
 # 所以，我别无选择，只能使用版本号作为标签。
 
 services:
+  2025:
+    image: ${REGISTRY_AND_USER}/texlive-full:2025.1
+    build:
+      context: ./texlive/2025
+      dockerfile: Dockerfile
   2024:
     image: ${REGISTRY_AND_USER}/texlive-full:2024.1
     build:

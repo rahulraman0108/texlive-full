@@ -8,7 +8,7 @@ on:
 
 env:
   DOCKER_REGISTRY: ghcr.io
-  IMAGE_NAME: ayaka-notes/texlive-full
+  IMAGE_NAME: rahulraman0108/texlive-full
   IMAGE_TAG: base
 
 jobs:
@@ -39,6 +39,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5.1.0
         with:
+            platforms: linux/amd64,linux/arm64
             context: texlive/Base
             file: texlive/Base/Dockerfile
             push: true
@@ -61,6 +62,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5.1.0
         with:
+            platforms: linux/amd64,linux/arm64
             context: texlive/Slim
             file: texlive/Slim/Dockerfile
             push: true

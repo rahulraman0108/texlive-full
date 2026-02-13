@@ -3,8 +3,8 @@ name: Clean Image(texlive-full)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  
-    # run every day
+    - cron: '0 0 * * 0'  
+    # run every week
 
 jobs:
   clean-ghcr-texlive:
@@ -16,6 +16,6 @@ jobs:
           image-names: texlive-full/*,texlive-full
           cut-off: 1 min ago UTC
           account-type: org
-          org-name: ayaka-notes
+          org-name: rahulraman0108
           untagged-only: true
           token: ${{ secrets.ORGTOKEN }}
