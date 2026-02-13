@@ -1,10 +1,10 @@
 # ---------------------------------------------
-# Overleaf TexLive 2024 (ayaka-notes/overleaf)
+# Overleaf TexLive 2025 (ayaka-notes/overleaf)
 # ---------------------------------------------
 
 # Use base image, see texlive/base
 # -----------------------------------
-FROM ghcr.io/ayaka-notes/texlive-full:base
+FROM ghcr.io/rahulraman0108/texlive-full:base
 
 # LABEL
 # -----------------------------------
