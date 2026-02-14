@@ -1,4 +1,4 @@
-name: Build texlive-full(ghcr)
+name: Build and publish texlive-full
 
 on:
   # push:
@@ -63,9 +63,6 @@ jobs:
           remove-cached-tools: 'true'
           show-top-packages: 'true'
 
-      # - name: Set up QEMU
-        # uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -76,12 +73,10 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=gha,scope=${{ github.workflow }}-${{ matrix.tex-version }}-${{ matrix.platform_pair }}
           cache-to: type=gha,scope=${{ github.workflow }}-${{ matrix.tex-version }}-${{ matrix.platform_pair }},mode=max
-          # platforms: linux/amd64,linux/arm64
           context: texlive/${{ matrix.tex-version }}
           file: texlive/${{ matrix.tex-version }}/Dockerfile
           # push: true
           labels: ${{ steps.meta.outputs.labels }}
-          # tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
