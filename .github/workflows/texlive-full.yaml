@@ -132,12 +132,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Create manifest list and push
+      - name: Create ghcr.io manifest list and push
         working-directory: ${{ runner.temp }}/digests
 
         run: |
           docker buildx imagetools create -t ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1 \
-            -t docker.io/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1 \
+            $(printf '${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Create docker.io manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+
+        run: |
+          docker buildx imagetools create -t docker.io/${{ env.IMAGE_NAME }}:${{ matrix.tex-version }}.1 \
             $(printf '${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Inspect image
