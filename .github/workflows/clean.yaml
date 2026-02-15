@@ -16,6 +16,6 @@ jobs:
           account-type: personal
           # account: rahulraman0108
           image-names: texlive-full/*, texlive-full
-          cut-off: 60s
+          cut-off: "60s+00:00"
           untagged-only: true
           token: ${{ secrets.PA_TOKEN }}
